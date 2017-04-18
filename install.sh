@@ -1,3 +1,4 @@
+pip install h5py
 pip install numpy
 pip install opencv-python
 pip install pandas

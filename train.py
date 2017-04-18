@@ -33,6 +33,7 @@ def load_data():
 
 	_paths = df['path'].values
 	_labels = df['label'].values
+	_y = df['tb'].values
 
 	num_png = len(_paths)
 	_index = range(num_png)
@@ -45,8 +46,10 @@ def load_data():
 	test_paths = _paths[test_index]
 	train_labels = _labels[train_index]
 	test_labels = _labels[test_index]
+	y_train = _y[train_index]
+	y_test = _y[test_index]
 
-	return train_paths, test_paths, train_labels, test_labels
+	return train_paths, test_paths, train_labels, test_labels, y_train, y_test
 
 
 def load_lung_masks(paths):
@@ -83,7 +86,15 @@ def add_margin(mask, margin):
 	return cv2.dilate(mask, kernel, iterations = margin)
 
 
-def get_submask(mask, region = 'lower')
+def get_submask(mask, region = 'lower'):
+	contour = get_contour(mask)
+	mid = get_mid(contour)
+	if region == 'lower':
+		mask[0:mid, :] = 0
+	elif region == 'upper':
+		mask[mid:, :] = 0
+	return mask
+
 
 def get_ground_truth(r_mask, l_mask, labels, margin = 0):
 	gt = np.zeros(r_mask.shape)
@@ -100,19 +111,18 @@ def get_ground_truth(r_mask, l_mask, labels, margin = 0):
 		elif label == 'rl':
 			mask = np.copy(r_mask)
 			mask = get_submask(mask, 'lower')
-		
 
 		if margin > 0:
 			mask = add_margin(mask, margin)
 		gt[i,:,:,0] = mask
 
 	return gt
-			
+
 
 
 
 def main():
-	train_paths, test_paths, train_labels, test_labels = load_data()
+	train_paths, test_paths, train_labels, test_labels, y_train, y_test = load_data()
 	print('num_train:', len(train_paths), 'num_test:', len(test_paths))
 
     img_paths_train = [os.path.join(png_dir, p) for p in train_paths]
@@ -134,6 +144,7 @@ def main():
     # ground truth
     ground_truth_train = get_ground_truth(r_mask_train, l_mask_train, train_labels)
     ground_test_train = get_ground_truth(r_mask_test, l_mask_test, test_labels)
+    
 
     
 
