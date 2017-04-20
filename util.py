@@ -4,7 +4,40 @@ from __future__ import print_function
 import cv2
 import numpy as np
 import os
+import pandas as pd
+import random
 import tensorflow as tf
+import time
+from env import *
+
+
+kernel = np.array([[0,1,0], [1,1,1], [0,1,0]])
+
+
+def load_data():
+	_file = os.path.join(proc_path, 'shenzhen.dev.csv')
+	df = pd.read_csv(_file)
+	print('read', _file)
+
+	_paths = df['path'].values
+	_labels = df['label'].values
+	_y = df['tb'].values
+
+	num_png = len(_paths)
+	_index = range(num_png)
+	random.seed(2017)
+	random.shuffle(_index)
+	train_index = _index[:int(num_png * 0.8)]
+	test_index = _index[int(num_png * 0.8):]
+
+	train_paths = _paths[train_index]
+	test_paths = _paths[test_index]
+	train_labels = _labels[train_index]
+	test_labels = _labels[test_index]
+	y_train = _y[train_index]
+	y_test = _y[test_index]
+
+	return train_paths, test_paths, train_labels, test_labels, y_train, y_test
 
 
 def get_num_model_params():
@@ -16,6 +49,21 @@ def get_num_model_params():
 	return num_params
 
 
+def read_png(paths, read_size):
+    """
+    paths: list of path.
+    return: np array [num_imgs, read_size[0], read_size[1], 1] of type uint8
+        [0, 256).
+    """
+    imgs = np.zeros((len(paths), read_size[0], read_size[1], 1), dtype=np.uint8)
+    for i, p in enumerate(paths):
+        assert os.path.isfile(p), 'cannot open ' + p
+        img = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
+        res = cv2.resize(img, dsize=read_size, interpolation=cv2.INTER_CUBIC)
+        imgs[i,:,:,0] = res
+    return imgs
+
+
 def read_mask(paths, read_size):
 	"""
 	Read gif/png masks as 0/1 np.uint8 array [num_masks, height, width, 1].
@@ -23,21 +71,22 @@ def read_mask(paths, read_size):
 	masks = np.zeros((len(paths), read_size[0], read_size[1], 1),
     	dtype=np.uint8)
 	for i, p in enumerate(paths):
-		img = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
+		mask = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
 		# squeeze the third dimension if present.
 
-    	if len(img.shape) > 2:
-			img = img[:,:,0]
+		if len(mask.shape) > 2:
+			mask = mask[:,:,0]
 
-    	img = cv2.resize(img, dsize=read_size, interpolation=cv2.INTER_CUBIC)
-    	img = mask_conversion(img, 1)
-		masks[i,:,:,0] = img
+		mask = cv2.resize(mask, dsize=read_size, interpolation=cv2.INTER_CUBIC)
+		mask = mask_conversion(mask, 1)
+		masks[i,:,:,0] = mask
 		
 	return masks
 
 
 def mask_conversion(img, target):
-	return img[np.nonzero(img)] == target
+	img[np.nonzero(img)] = target
+	return img
 
 
 def standardize(imgs):
@@ -48,14 +97,20 @@ def standardize(imgs):
 	imgs = imgs.astype(np.float32)
 	imgs -= np.mean(imgs)
 	# imgs /= np.std(imgs)
+	return imgs
+
+
+def blackout(imgs, right_masks, left_masks, margin):
+	masks = right_masks + left_masks
+	for i in xrange(masks.shape[0]):
+		masks[i,:,:,0] = cv2.dilate(masks[i,:,:,0], kernel, iterations = margin)
+		imgs[i][np.where(masks[i] == 0)] = 0
 
 	return imgs
 
 
-def compute_iou(mask, gt):
-	tp = np.sum((mask == 1) & (gt == 1))
-	xor = np.sum((mask == 1) & (gt == 1))
-	return tp / (tp + xor)
+def add_margin(mask, margin):
+	return cv2.dilate(mask, kernel, iterations = margin)
 
 
 class BatchNorm(object):
@@ -148,12 +203,12 @@ def get_logger(filename=None):
     frame = inspect.stack()[1]      # caller frame
     filename_with_extension = os.path.basename(inspect.getfile(frame[0]))
     filename = filename_with_extension.split('.')[0]
-    log_dir = os.path.join(k_proj_path, "log")
+    log_dir = os.path.join(proj_path, "log")
     if not os.path.isdir(log_dir):
         os.makedirs(log_dir)
 
     # set up logging to file - see previous section for more details
-    format_str = '[%(asctime)s %(levelname)s %(name)s:%(lineno)s] %(message)s'
+    format_str = '[%(asctime)s %(levelname)s %(name)s] %(message)s'
     logging.basicConfig(level=logging.INFO, # Set logging level here!
                                             format=format_str,
                                             datefmt='%Y%m%d %H:%M:%S',
@@ -170,3 +225,14 @@ def get_logger(filename=None):
     logging.getLogger(filename).addHandler(console_handler)
 
     return SmartLogger(logging.getLogger(filename))
+
+
+class Timer():
+    def __init__(self):
+        self.restart()
+
+    def restart(self):
+        self.start = time.time()
+
+    def elapsed(self):
+        return round(time.time() - self.start, 2)

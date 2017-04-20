@@ -12,4 +12,4 @@ png_dir = os.path.join(data_path, 'shenzhen/CXR_png_800x800')
 
 proj_path = os.path.dirname(os.path.abspath(__file__))
 proc_path = os.path.join(proj_path, 'processed')
-model_path = os.path.join(proj_path, 'models')
+model_path = os.path.join(proj_path, 'model_params')

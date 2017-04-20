@@ -1,0 +1,6 @@
+[20170419 17:53:40 INFO model] conv0 output [None, 400, 400, 8]
+[20170419 17:53:41 INFO model] conv1 output [None, 400, 400, 8]
+[20170419 17:53:41 INFO model] conv2 output [None, 200, 200, 16]
+[20170419 17:53:41 INFO model] conv3 output [None, 200, 200, 16]
+[20170419 17:53:41 INFO model] conv4 output [None, 100, 100, 32]
+[20170419 17:53:41 INFO model] conv5 output [None, 100, 100, 32]

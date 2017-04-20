@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
 from __future__ import print_function
-import attention.util
 import tensorflow as tf
 import tflearn
 import tflearn.initializations as tfi
@@ -13,8 +12,8 @@ tflearn version: 0.3
 """
 logger = get_logger()
 
-class Model(object):
-    def __init__(self, x_, y_, o_, nf_, num_grid):
+class BaseModel(object):
+    def __init__(self, x_, y_, nf_):
         """
         x_: tf.placeholder(tf.float32, [None, h, w, 1])
         y_: tf.placeholder(tf.int32, [None,]) 0/1 (no_tb, tb)
@@ -22,9 +21,7 @@ class Model(object):
         """
         self.x_ = x_
         self.y_ = y_
-        self.o_ = o_
         self.nf_ = nf_
-        self.num_grid = num_grid
         self.bns = []
 
     def build_train_model(self):
@@ -194,6 +191,7 @@ class Model(object):
                 'stride': 1, 'padding': 'same', 'l2': l2, 'is_train': is_train})
             x = self._conv_relu_bn(x, {'num_filters': 4*nf, 'filter_size': 3,
                 'stride': 1, 'padding': 'same', 'l2': l2, 'is_train': is_train})
+            x = self._fully_connected(x, {'num_outputs': 1, 'l2': l2})
         return x
 
     def loss(self, logits):
@@ -207,8 +205,20 @@ class Model(object):
         """
         # Define loss
         print('logits shape', logits.get_shape().as_list())
-        y = self.y_
+        y = tf.cast(tf.expand_dims(self.y_, 1), tf.float32)
         print('y shape:', y.get_shape().as_list())
+        cross_entropy = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels = y, logits = logits))
+        tf.add_to_collection('losses', cross_entropy)
+        c1 = tf.sigmoid(logits)
+        c0 = 1 - c1
+        prob = tf.concat([c0, c1], 1)
+        #print('prob shape', prob.get_shape().as_list())
 
+        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        correct_pred = tf.nn.in_top_k(prob, self.y_, 1)
+        total_reg_losses = tf.add_n(reg_losses)
+        total_loss = total_reg_losses + cross_entropy
 
-        return logits
+        # Evaluate model
+        accuracy = tf.reduce_sum(tf.cast(correct_pred, tf.float32))
+        return cross_entropy, total_reg_losses, total_loss, accuracy, c1

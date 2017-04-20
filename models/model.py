@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
 from __future__ import print_function
-import attention.util
+import attention
 import tensorflow as tf
 import tflearn
 import tflearn.initializations as tfi
@@ -14,7 +14,7 @@ tflearn version: 0.3
 logger = get_logger()
 
 class Model(object):
-    def __init__(self, x_, y_, o_, nf_, num_grid):
+    def __init__(self, x_, y_, nf_, num_grid):
         """
         x_: tf.placeholder(tf.float32, [None, h, w, 1])
         y_: tf.placeholder(tf.int32, [None,]) 0/1 (no_tb, tb)
@@ -22,7 +22,6 @@ class Model(object):
         """
         self.x_ = x_
         self.y_ = y_
-        self.o_ = o_
         self.nf_ = nf_
         self.num_grid = num_grid
         self.bns = []
